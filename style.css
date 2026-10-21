@@ -1,0 +1,1006 @@
+/*
+ * How to speak whale: story-specific styles only.
+ * Everything typographic, colour-scheme and spacing that the design system covers is a
+ * utility class in index.html; this file covers layout the utility layer has no class for
+ * (the 3D stage, the immersive hero, scene pacing, the story nav) and the browser surfaces.
+ * Raw values carry a comment naming the token or production value they match.
+ *
+ * Layout (CONTRACT v6, "split stage"): the hero is full-bleed 3D; through the scenes the 3D
+ * sits in an inset frame beside the text (wide screens, short landscape phones) or across the
+ * top of the screen (phones, tablets), and text never sits on the 3D. main.js animates the
+ * frame from full-bleed to inset with scroll (#stage clip-path, state.inset).
+ */
+
+:root {
+	/*
+	 * Data-viz and 3D-scene colours (CONTRACT v0). The design system has no ocean or
+	 * per-whale encodings; these are used only by scene.js / overlays.js, the no-WebGL
+	 * stage fallback and the trivia accent. Declared once here.
+	 */
+	--ink: #07131c;
+	--sea-shallow: #1d6f8f;
+	--sea-deep: #03111a;
+	--dawn: #f3b27a;
+	--text: #eaf2f6;
+	--muted: #9db3c0;
+	--whale-a: #ffb547;
+	--whale-b: #5ad1e6;
+	--whale-c: #f2728c;
+	--echo: #cfd8dc;
+
+	/* SpacingSys tokens (the utility layer exposes classes, not custom properties). */
+	--space-micro: 4px;       /* SpacingSys::Micro */
+	--space-base: 8px;        /* SpacingSys::Base */
+	--space-small: 12px;      /* SpacingSys::Small */
+	--space-compact: 16px;    /* SpacingSys::Compact */
+	--space-medium: 24px;     /* SpacingSys::Medium */
+	--space-large: 32px;      /* SpacingSys::Large */
+	--space-xl: 48px;         /* SpacingSys::Extra_Large */
+	--space-xxl: 64px;        /* SpacingSys::Extra_Extra_Large */
+	--space-96: 96px;         /* SpacingRef::Space_96 */
+
+	--radius-small: 8px;      /* ShapeSys::Small */
+	--radius-medium: 12px;    /* ShapeSys::Medium */
+	--radius-xl: 28px;        /* ShapeSys::Extra_Large */
+	--radius-full: 9999px;    /* ShapeSys::Full */
+	--target: 44px;           /* SizingRef 44: minimum touch target */
+
+	/* Screen margin: SpacingSys::Screen_Margin_Compact below Medium, _Expanded above. */
+	--gutter: var(--space-compact);
+	--scene-left: max(var(--space-xl), calc((100vw - 1280px) / 2)); /* 1280 = post-header's wide container */
+
+	/* Dark surfaces of the immersive scenes. */
+	/* Scene surface: the contract's deep-sea tone (#03111a), not pure black, so the text column
+	   reads as the same water as the stage. White text on it is 18.9:1. */
+	--scene-ink: var(--sea-deep);
+	--scene-on: var(--ngn-v2-sys-color-inverse-on-surface);
+	--scene-on-muted: color-mix(in srgb, var(--scene-on) 78%, transparent); /* 11:1 on black */
+
+	--whale-focus: var(--ngn-v2-sys-color-primary);
+	--whale-focus-dark: var(--whale-a); /* data amber: 10.9:1 on black, 6:1+ on the 3D ocean */
+}
+
+@media (min-width: 600px) {
+	:root { --gutter: var(--space-medium); }
+}
+
+/* Browser surfaces */
+
+html {
+	scrollbar-color: var(--ngn-v2-sys-color-outline) var(--ngn-v2-sys-color-surface);
+	caret-color: var(--ngn-v2-sys-color-primary);
+}
+
+::selection {
+	background: var(--ngn-v2-sys-color-primary);
+	color: var(--ngn-v2-sys-color-on-primary);
+}
+
+:focus-visible {
+	outline: 2px solid var(--whale-focus);
+	outline-offset: 2px; /* matches the theme's 2px focus-ring offset */
+}
+
+.whale-hero :focus-visible,
+.whale-scene :focus-visible,
+.whale-nav :focus-visible {
+	outline-color: var(--whale-focus-dark);
+}
+
+.whale-scene ::selection,
+.whale-nav ::selection {
+	background: var(--whale-a);
+	color: var(--scene-ink);
+}
+
+.whale-scene__heading:focus { outline: none; } /* jump target, focused by the nav for screen readers */
+
+.entry-content a {
+	text-underline-offset: 0.18em;
+	text-decoration-thickness: 1px;
+}
+
+/* 3D stage */
+
+#stage {
+	position: fixed;
+	inset: 0;
+	z-index: 0;
+	overflow: hidden;
+	pointer-events: none;
+	background: var(--sea-deep);
+	opacity: 0;
+	visibility: hidden;
+}
+
+#gl,
+#overlay {
+	position: absolute;
+	inset: 0;
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+#overlay { z-index: 1; }
+#hud { position: absolute; inset: 0; z-index: 2; }
+
+/* No WebGL / scene failed: the featured photo stands in for the 3D world. */
+.no-webgl #stage {
+	/* The photo when it lands; under it, the critique's measured water column (surface
+	   #1a86b8 → 10–20 m #00467f → 150 m #00182f → 600 m #010306). */
+	background:
+		url("assets/featured.jpg") center / cover no-repeat,
+		linear-gradient(to bottom, #1a86b8 0%, #0b6aa8 16%, #00467f 42%, #00182f 78%, #010306 100%);
+}
+
+/* Everything readable paints above the stage. */
+.site-header,
+#site-content,
+.site-footer {
+	position: relative;
+	z-index: 1;
+}
+
+body { background: var(--ngn-v2-sys-color-surface); }
+#site-content,
+#site-content > .entry-content {
+	padding-inline: 0; /* full-bleed sections own their gutters */
+	background: transparent;
+}
+.site-footer {
+	margin-top: 0;
+	display: flow-root; /* its first child's 4px top margin would otherwise collapse through and open a gap over the stage */
+}
+
+/* Immersive hero (post header over the `open` shot) */
+
+.entry-content > .whale-hero {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	/* Fill the first screen below the site header (main.js measures it into --whale-header-h). */
+	min-height: calc(100svh - var(--whale-header-h, 0px));
+	margin: 0 !important; /* beats the constrained layout's auto margins (WP uses !important) */
+	max-width: none;
+	padding: 0;
+	color: var(--scene-on);
+}
+
+.whale-hero__inner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-medium);
+	padding: var(--space-96) var(--gutter) var(--space-xl);
+}
+
+.whale-hero .whale-hero__hed {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-compact);
+	max-width: 720px; /* TextSizeRef::Size_720 */
+	margin: 0;
+}
+
+.whale-hero .whale-hero__title,
+.whale-hero .whale-hero__dek {
+	margin: 0;
+	color: inherit;
+	text-align: center;
+}
+
+.whale-hero .author-info { margin: 0; }
+.whale-hero .byline-and-share { justify-content: center; max-width: none; }
+
+.whale-hero .author {
+	font-family: var(--font-sans);
+	font-size: 15px; /* FontSizeSys::Label_LG */
+	font-style: normal;
+	color: inherit;
+}
+
+/* Production author-info greys each part (#4b4b4b); too faint over the scrim. */
+.whale-hero .author-info .author :is(.author-by, .author__name, .author__role) { color: var(--scene-on); }
+.whale-hero .author__name { font-weight: 700; }
+
+/* Light prose (intro, closing, credits) */
+
+.entry-content > .whale-prose {
+	max-width: none;
+	margin: 0 !important; /* full-bleed surface; WP's constrained layout centres with !important */
+	padding: var(--space-xxl) var(--gutter);
+}
+
+.whale-prose > p { margin-block: 0 var(--space-medium); text-wrap: pretty; }
+.whale-prose > p:last-of-type { margin-bottom: 0; }
+.whale-prose--closing { padding-bottom: var(--space-xxl); }
+
+.whale-dateline {
+	font-weight: 700;
+	letter-spacing: 0.02em; /* LetterSpacingSys::Slight, as the production dateline */
+}
+
+.whale-featured { margin-block-end: var(--wp--preset--spacing--40, 2rem); /* matches the live post's figure rhythm */ }
+.whale-featured img { display: block; width: 100%; height: auto; aspect-ratio: 1400 / 933; object-fit: cover; }
+
+.whale-credits {
+	margin-top: var(--space-xl) !important;
+	padding-block: var(--space-medium);
+	border-block: 1px solid var(--ngn-v2-sys-color-outline-variant);
+	color: var(--ngn-v2-sys-color-on-surface-variant);
+}
+
+.whale-credits h2 {
+	margin: 0 0 var(--space-small);
+	color: var(--ngn-v2-sys-color-on-surface);
+	text-wrap: balance;
+}
+
+.whale-credits__list { margin: 0; padding-left: 0; list-style: none; }
+.whale-credits__list li + li { margin-top: var(--space-base); }
+
+.whale-hero__title { text-wrap: balance; }
+
+/* Editor placeholders (TK, WHEN): visible until the writer fills them. */
+.whale-tk {
+	background: var(--ngn-v2-sys-color-primary-container);
+	color: var(--ngn-v2-sys-color-on-primary-container);
+	padding-inline: var(--space-micro);
+	border-radius: 2px; /* matches the production inline-code chip radius */
+}
+
+/* Immersive scenes: shared parts */
+
+.entry-content > .whale-scene {
+	position: relative;
+	max-width: none;
+	margin: 0 !important; /* full-bleed dark surface beside/under the stage */
+	padding: 0 0 var(--space-96);
+	color: var(--scene-on);
+}
+
+.whale-scene__opener {
+	box-sizing: border-box;
+	display: flex;
+	min-height: 100svh; /* the shot-to-shot blend plays out across the opener (CONTRACT v5) */
+	padding-inline: var(--gutter);
+}
+
+.whale-scene__heading {
+	max-width: 720px; /* TextSizeRef::Size_720 */
+	margin: 0;
+	color: inherit;
+	text-wrap: balance;
+}
+
+.whale-step {
+	box-sizing: border-box;
+	display: flex;
+	padding-inline: var(--gutter);
+}
+
+.whale-card { box-sizing: border-box; }
+
+.whale-card .whale-card__p {
+	margin: 0;
+	color: inherit;
+	text-wrap: pretty;
+}
+
+.whale-card .whale-card__p + .whale-card__p { margin-top: var(--space-compact); }
+
+/* Schematic note: production caption cut. 80% of on-surface stays above 4.5:1 on every panel. */
+.whale-card .whale-card__note {
+	margin: var(--space-medium) 0 0;
+	color: color-mix(in srgb, var(--scene-on) 80%, transparent);
+}
+
+.whale-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-small);
+	margin-top: var(--space-medium);
+}
+
+.whale-card > .whale-card__actions:first-child { margin-top: 0; } /* the button-only vowel card */
+
+/* Bonus trivia: a side fact, not story text. Serif display voice, amber click-wave glyph and
+   matching inline lead-in; set off by hairlines in the scene section below. */
+.whale-trivia {
+	--trivia-accent: var(--whale-a);
+	position: relative;
+	box-sizing: border-box;
+	color: var(--scene-on);
+	transition: opacity 600ms ease, transform 600ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.whale-trivia.is-waiting {
+	opacity: 0;
+	transform: translateY(var(--space-large));
+}
+
+.whale-trivia__glyph { flex: none; color: var(--trivia-accent); }
+
+.whale-trivia .whale-trivia__p {
+	margin: 0;
+	color: inherit;
+	text-wrap: pretty;
+}
+
+.whale-trivia__lead {
+	margin-right: var(--space-micro);
+	color: var(--trivia-accent);
+	vertical-align: 0.15em; /* sits the 13.6px sans lead-in on the serif x-height */
+}
+
+/* Phone type: production Body_SM 16/24 for story text, Headline_XS 19.3/28 for trivia. */
+@media (max-width: 839px) {
+	.whale-card {
+		font-size: 16px;   /* FontSizeSys::Body_SM */
+		line-height: 24px; /* LineHeight 24 */
+	}
+
+	.whale-trivia .whale-trivia__p {
+		font-size: 19.3px; /* FontSizeSys::Headline_XS */
+		line-height: 28px; /* LineHeight 28 */
+	}
+
+	.whale-trivia__glyph { width: 24px; height: 24px; }
+	.whale-card__actions { margin-top: var(--space-compact); }
+	.whale-card .whale-card__note { margin-top: var(--space-compact); }
+}
+
+/* Audio buttons */
+
+.whale-audio {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-base);
+	min-height: var(--target);
+	padding: var(--space-base) var(--space-compact) var(--space-base) var(--space-small);
+	color: inherit;
+	background: transparent;
+	border: 1px solid currentColor;
+	border-radius: var(--radius-full);
+	cursor: pointer;
+	text-align: left;
+	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.whale-audio:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+.whale-audio:active { transform: scale(0.98); }
+
+.whale-audio[aria-pressed="true"] {
+	color: var(--scene-ink);
+	background: var(--scene-on);
+	border-color: var(--scene-on);
+}
+
+.whale-audio[data-state="error"] { border-style: dashed; cursor: not-allowed; }
+.whale-audio[data-state="error"] .whale-audio__label { color: inherit; }
+
+.whale-audio__icon { flex: none; }
+.whale-audio__icon--pause,
+.whale-audio__icon--error { display: none; }
+.whale-audio[aria-pressed="true"] .whale-audio__icon--play { display: none; }
+.whale-audio[aria-pressed="true"] .whale-audio__icon--pause { display: block; }
+.whale-audio[data-state="error"] .whale-audio__icon--play { display: none; }
+.whale-audio[data-state="error"] .whale-audio__icon--error { display: block; }
+.whale-audio__spectrum { flex: none; margin-left: calc(-1 * var(--space-micro)); }
+
+/* Muted: the clip buttons say so; pressing one lifts the mute (main.js). */
+.is-muted .whale-audio:not([aria-pressed="true"]) { border-style: dotted; }
+
+/*
+ * Split stage geometry. One set of custom properties drives the stage frame, the text column,
+ * the docked step bar and the sticky cards, so they can never disagree.
+ *
+ * Stacked (phones, tablets, 1024 landscape): the frame spans the top --stage-h of the screen;
+ * text runs beneath it on the dark scene surface. svh, not dvh: the frame must not resize
+ * while the iOS address bar slides, and sticky offsets use the same unit.
+ *
+ * Split (>= BreakpointSys::Large 1200, and short landscape phones): the frame is inset on the
+ * right; the text column is --c-text wide (55–70ch of 19.3px Lato, which sets at 8.6px/ch).
+ */
+
+:root {
+	--stage-h: 52svh;                          /* stacked frame height */
+	--c-inset: 0px;                            /* stacked: the frame meets the screen edges */
+	--c-text: 100%;
+	--c-pad-l: var(--gutter);
+	--c-pad-r: var(--gutter);
+	--c-measure: none;
+	--frame-radius: 0px;
+	--whale-header-h: 56px;                    /* production site header below 782px; main.js re-measures */
+}
+
+@media (min-width: 600px) {
+	:root { --c-measure: 480px; }              /* ~67ch of 16px Lato (7.15px/ch) */
+}
+
+@media (min-width: 782px) {
+	:root { --whale-header-h: 88px; }          /* production site header, 782–839px */
+}
+
+@media (min-width: 840px) {
+	:root {
+		--stage-h: 46svh;                      /* landscape tablets: leave room for 19.3px text */
+		--c-measure: 560px;                    /* ~65ch of 19.3px Lato */
+		--whale-header-h: 121px;               /* production site header, 840–1199px */
+	}
+}
+
+/* Short phones: a slightly shorter frame so long cards still fit beneath it. */
+/* Narrow phones (360): more lines per card, so a slightly shorter frame. */
+@media (max-width: 380px) {
+	:root { --stage-h: 46svh; }
+}
+
+@media (max-width: 839px) and (max-height: 700px) {
+	:root { --stage-h: 40svh; } /* 375×667: leaves ~370px so the longest card parks whole */
+}
+
+@media (min-width: 1200px) {
+	:root {
+		--c-inset: var(--space-medium);
+		--c-text: 520px;                       /* 60ch */
+		--c-pad-l: var(--space-xl);
+		--c-pad-r: 40px;                      /* SpacingSys::Large_Increased */
+		--c-measure: var(--c-text);
+		--frame-radius: var(--radius-medium);
+		--whale-header-h: 153px;               /* production site header from 1200px */
+	}
+}
+
+@media (min-width: 1440px) {
+	:root {
+		--c-text: 560px;                       /* 65ch */
+		--c-pad-l: var(--space-xxl);
+		--c-pad-r: var(--space-xl);
+	}
+}
+
+@media (min-width: 1920px) {
+	:root {
+		--c-inset: var(--space-large);
+		--c-text: 680px;                       /* 66ch of 23px Lato (10.3px/ch): Body_LG from here up */
+		--c-pad-l: var(--space-96);
+		--c-pad-r: var(--space-xxl);
+	}
+}
+
+@media (min-width: 2560px) {
+	:root {
+		--c-text: 720px;                       /* 70ch of 23px Lato */
+		--c-pad-l: 128px;                      /* SpacingRef::Space_128: keeps the column off the far edge of a 2560 screen */
+		--c-pad-r: 72px;                       /* SpacingSys::Extra_Extra_Large_Increased */
+	}
+}
+
+/* Short landscape phones (e.g. 844×390): split, not stacked: a 52svh band would leave ~190px. */
+@media (max-width: 1199px) and (orientation: landscape) and (max-height: 540px) {
+	:root {
+		--c-inset: var(--space-base);
+		--c-text: calc(50vw - var(--c-pad-l) - var(--c-pad-r));
+		--c-pad-l: max(var(--space-medium), env(safe-area-inset-left, 0px));
+		--c-pad-r: var(--space-medium);
+		--c-measure: none;
+		--frame-radius: var(--radius-small);
+	}
+}
+
+:root {
+	--c-col: calc(var(--c-text) + var(--c-pad-l) + var(--c-pad-r));
+	--rail-h: var(--space-xl); /* split layouts: the step bar's band under the frame */
+}
+
+/* The inset frame, as geometry only: main.js reads it to animate #stage's clip and to place
+   subjects (state.safe). Invisible. */
+.whale-frame {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: var(--stage-h);
+	visibility: hidden;
+	pointer-events: none;
+}
+
+/* Stacking: scenes (dark, opaque) < stage < light prose, hero, header, footer. */
+#site-content { z-index: auto; }
+.entry-content > :is(.whale-hero, .whale-prose) { position: relative; z-index: 3; }
+:is(.site-header, .site-footer) { z-index: 3; }
+#stage { z-index: 2; }
+
+.entry-content > .whale-scene {
+	z-index: 1;
+	background: var(--scene-ink);
+	padding-bottom: 0;
+}
+
+.entry-content > .whale-scene:last-of-type { padding-bottom: 20svh; } /* the beams hold before the closing prose */
+
+/* Text column (stacked: centred measure; split: the left column). */
+.whale-scene > * {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: calc(var(--c-measure) + 2 * var(--gutter));
+	margin-inline: auto;
+}
+
+.whale-card {
+	width: 100%;
+	padding: 0;
+	background: none;
+	transition: opacity 320ms ease;
+}
+
+/* The step the stage is showing reads at full strength; its neighbours recede (still 6:1). */
+.whale-step:not(.is-current) > .whale-card { opacity: 0.6; }
+
+/* Bonus trivia: set off by amber hairlines, serif voice and the click-wave glyph. No box. */
+.whale-trivia {
+	background: none; /* the scene surface; no box of its own that could peek out under the frame */
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: var(--space-compact);
+	align-items: start;
+	width: 100%;
+	padding-block: var(--space-medium);
+	border-block: 1px solid color-mix(in srgb, var(--trivia-accent) 45%, transparent);
+}
+
+.whale-trivia__glyph { margin-top: var(--space-micro); }
+
+/* Stacked: the opener heading and each card park just beneath the frame. */
+.whale-scene__opener {
+	align-items: flex-start;
+	min-height: 90svh;
+	padding-top: calc(var(--stage-h) + var(--space-xl));
+}
+
+.whale-scene__heading {
+	font-size: 34px;   /* FontSizeSys::Display_SM */
+	line-height: 40px; /* LineHeight 40, the Display_SM pairing */
+}
+
+.whale-step {
+	flex-direction: column;
+	align-items: stretch;
+	/* Each card parks for ~60svh minus its own height, then leaves with a 28svh run of empty
+	   surface before the next card enters (bottom padding is outside the sticky range). */
+	min-height: 88svh;
+	padding-bottom: 28svh;
+}
+
+/* A card too tall for the reading area under the frame scrolls through instead of parking,
+   so its last lines are never held out of view (main.js measures and sets .is-tall). */
+.whale-step > .is-tall { position: static; }
+
+.whale-step > :is(.whale-card, .whale-trivia) {
+	position: sticky;
+	top: calc(var(--stage-h) + var(--space-large));
+}
+
+@media (min-width: 840px) {
+	.whale-scene__heading {
+		font-size: 40px;   /* FontSizeSys::Display_MD */
+		line-height: 48px; /* LineHeight 48, the Display_MD pairing */
+	}
+}
+
+/* Split */
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	.whale-frame {
+		top: var(--c-inset);
+		right: var(--c-inset);
+		bottom: calc(var(--c-inset) + var(--rail-h) + var(--space-base)); /* the rail sits in the gutter beneath the frame */
+		left: var(--c-col);
+		height: auto;
+	}
+
+	.whale-scene > * {
+		width: var(--c-col);
+		max-width: none;
+		margin-inline: 0;
+		padding-left: var(--c-pad-l);
+		padding-right: var(--c-pad-r);
+	}
+
+	.whale-scene__opener {
+		align-items: center;
+		min-height: 80svh;
+		padding-top: 0;
+	}
+
+	.whale-step {
+		justify-content: center;
+		min-height: 80svh;
+		padding-bottom: 0;
+	}
+
+	.whale-step > :is(.whale-card, .whale-trivia) { position: static; }
+}
+
+@media (min-width: 1200px) {
+	.whale-scene__heading {
+		font-size: 48px;   /* FontSizeSys::Display_LG */
+		line-height: 52px; /* LineHeight 52 (hero hed pairing) */
+	}
+}
+
+/* Large screens: the column steps up a type size so it holds its own beside a frame that is
+   over half the screen (the column widens above to keep 66–70ch). */
+@media (min-width: 1920px) {
+	.whale-card {
+		font-size: 23px;   /* FontSizeSys::Body_LG */
+		line-height: 36px; /* LineHeight 36: nearest token to Body_LG's 1.5 reading leading */
+	}
+
+	.whale-card .whale-card__p + .whale-card__p { margin-top: var(--space-medium); }
+	.whale-card .whale-card__note { margin-top: var(--space-large); font-size: 15px; line-height: 20px; } /* Label_LG / LineHeight 20 */
+
+	.whale-trivia .whale-trivia__p {
+		font-size: 26px;   /* FontSizeSys::Headline_MD */
+		line-height: 36px; /* LineHeight 36 */
+	}
+
+	.whale-trivia { padding-block: var(--space-large); }
+	.whale-trivia__glyph { width: 40px; height: 40px; }
+
+	.whale-scene__heading {
+		font-size: 64px;   /* FontSizeSys::Display_XL */
+		line-height: 64px; /* LineHeight 64, the Display_XL pairing */
+	}
+
+	.whale-audio { font-size: 16px; line-height: 24px; } /* Label one step up: Body_SM / LineHeight 24 */
+}
+
+/* Short landscape phones keep phone type and fill the height with each step. */
+@media (max-width: 1199px) and (orientation: landscape) and (max-height: 540px) {
+	.whale-card {
+		font-size: 16px;   /* FontSizeSys::Body_SM */
+		line-height: 24px; /* LineHeight 24 */
+	}
+
+	.whale-trivia .whale-trivia__p {
+		font-size: 19.3px; /* FontSizeSys::Headline_XS */
+		line-height: 28px;
+	}
+
+	.whale-scene__heading {
+		font-size: 28px;   /* FontSizeSys::Headline_LG */
+		line-height: 32px;
+	}
+
+	.whale-scene__opener,
+	.whale-step { min-height: 100svh; }
+
+	.whale-hero__inner { padding-top: var(--space-xl); padding-bottom: var(--space-medium); }
+}
+
+/*
+ * Story nav: progress through the five steps + conclusion, jump links, one sound toggle.
+ * It docks along the foot of the frame, like a player's scrubber.
+ */
+
+.whale-nav {
+	position: fixed;
+	z-index: 6;
+	top: calc(var(--stage-h) - var(--target));
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-micro);
+	box-sizing: border-box;
+	height: var(--target);
+	padding: 0 max(var(--space-base), env(safe-area-inset-right, 0px)) 0 max(var(--space-base), env(safe-area-inset-left, 0px));
+	color: var(--scene-on);
+	background: linear-gradient(to top, color-mix(in srgb, var(--scene-ink) 84%, transparent), color-mix(in srgb, var(--scene-ink) 50%, transparent));
+	/* Hidden outside the scenes by opacity only: the links stay in the Tab order, and the bar
+	   reveals itself when a keyboard user reaches it (focus-within below). */
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 240ms ease;
+}
+
+.whale-nav[data-visible="true"],
+.whale-nav:focus-within {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+
+
+.whale-nav__list {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.whale-nav__item { flex: 1; min-width: 0; margin: 0; }
+
+.whale-nav__link {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-base);
+	min-width: var(--target);
+	min-height: var(--target);
+	color: var(--scene-on-muted);
+	text-decoration: none;
+	border-radius: var(--radius-small);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	transition: color 160ms ease, background-color 160ms ease;
+}
+
+.whale-nav__link:hover { color: var(--scene-on); background: color-mix(in srgb, var(--scene-on) 10%, transparent); }
+.whale-nav__link:active { background: color-mix(in srgb, var(--scene-on) 18%, transparent); }
+.whale-nav__link[aria-current="step"] { color: var(--scene-on); }
+.whale-nav :focus-visible { outline: 2px solid var(--whale-focus-dark); outline-offset: -2px; } /* inside the bar, never clipped by the screen edge; solid (production dots link focus) */
+
+/* The tick: future 45% (4.4:1 on the bar), done 72%, current full and thicker. */
+.whale-nav__mark {
+	display: block;
+	width: 100%;
+	max-width: 40px;
+	height: 3px;
+	border-radius: var(--radius-full);
+	background: color-mix(in srgb, var(--scene-on) 45%, transparent);
+	transition: background-color 200ms ease, transform 200ms ease;
+}
+
+.whale-nav__link[data-past="true"] .whale-nav__mark { background: color-mix(in srgb, var(--scene-on) 72%, transparent); }
+.whale-nav__link[aria-current="step"] .whale-nav__mark { background: var(--scene-on); transform: scaleY(1.67); }
+
+/* Ticks only below 1200: names are for assistive tech. */
+.whale-nav__label,
+.whale-sound .whale-sound__label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.whale-nav__progress { display: none; }
+
+.whale-sound {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	min-width: var(--target);
+	min-height: var(--target);
+	padding: 0 var(--space-small);
+	color: var(--scene-on);
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-full);
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	transition: background-color 160ms ease, transform 120ms ease;
+}
+
+.whale-sound:hover { background: color-mix(in srgb, var(--scene-on) 12%, transparent); }
+.whale-sound:active { transform: scale(0.96); background: color-mix(in srgb, var(--scene-on) 20%, transparent); }
+.whale-sound__icon--off,
+.whale-sound[data-muted="true"] .whale-sound__icon--on { display: none; }
+.whale-sound[data-muted="true"] .whale-sound__icon--off { display: block; }
+
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	.whale-nav {
+		top: auto;
+		left: var(--c-col);
+		right: var(--c-inset);
+		bottom: var(--c-inset);
+		height: var(--rail-h);
+		min-height: 0;
+		padding: 0;
+		background: var(--scene-ink); /* sits on the scene surface, outside the frame */
+	}
+
+	.whale-nav__mark { max-width: none; }
+}
+
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1199px) {
+	:root { --rail-h: var(--target); }
+}
+
+@media (min-width: 1200px) {
+	.whale-nav__link { padding: var(--space-small) var(--space-base) var(--space-base); }
+
+	.whale-nav__label {
+		position: static;
+		width: auto;
+		height: auto;
+		overflow: visible;
+		clip-path: none;
+	}
+}
+
+/* Motion */
+
+@media (prefers-reduced-motion: reduce) {
+	.whale-audio,
+	.whale-trivia,
+	.whale-nav,
+	.whale-nav__link,
+	.whale-nav__mark,
+	.whale-card { transition: none; }
+	.whale-trivia.is-waiting { opacity: 1; transform: none; }
+}
+
+/* The dek ends mid-sentence in the writer's draft. Flag it without touching the copy (generated
+   content, so the verbatim check is unaffected); styled as the other editor placeholders. */
+.whale-hero__dek::after {
+	content: "TK";
+	margin-left: 0.3em;
+	padding-inline: var(--space-micro);
+	border-radius: 2px; /* matches .whale-tk */
+	background: var(--ngn-v2-sys-color-primary-container);
+	color: var(--ngn-v2-sys-color-on-primary-container);
+}
+
+/* Until the web fonts arrive (≤1.2 s, inline head script), header and hero type stay invisible so
+   the font swap cannot shift visible layout. The header's own bar stays painted. */
+.fonts-pending .site-header > *,
+.fonts-pending .whale-hero__inner { visibility: hidden; }
+
+/* The nav lives inside .entry-content (for Tab order); keep WordPress's
+   constrained-layout width, margins and link styling off them. */
+.entry-content > .whale-nav {
+	max-width: none;
+	margin: 0 !important; /* WP's constrained layout centres children with !important */
+}
+
+/* Production post-content link rules (blue, underlined) outrank plain classes; the ID scopes
+   the nav's own link styling above them. */
+#site-content .whale-nav .whale-nav__link {
+	color: var(--scene-on-muted);
+	text-decoration: none;
+}
+
+#site-content .whale-nav .whale-nav__link:is(:hover, [aria-current="step"]) { color: var(--scene-on); }
+#site-content .whale-nav .whale-nav__link * { text-decoration: none; color: inherit; }
+
+/* Revealed by keyboard focus outside the scenes (hero, prose): pinned full-width to the foot of
+   the viewport on a solid scene surface, so it never covers the byline or floats over the sea.
+   Declared last so it overrides every docked placement above. */
+.whale-nav:focus-within:not([data-visible="true"]) {
+	top: auto;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: auto;
+	min-height: calc(var(--space-xl) + env(safe-area-inset-bottom, 0px));
+	padding: 0 max(var(--space-base), env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(var(--space-base), env(safe-area-inset-left, 0px));
+	border-radius: 0;
+	background: var(--scene-ink);
+}
+
+/*
+ * ?theme=light (CONTRACT v7): the text column on the production light surface; the stage frame
+ * stays the dark ocean. Every column treatment reads its colours from these scene variables.
+ */
+[data-whale-theme="light"] .whale-scene {
+	--scene-ink: var(--ngn-v2-sys-color-surface);
+	--scene-on: var(--ngn-v2-sys-color-on-surface);
+	--scene-on-muted: var(--ngn-v2-sys-color-on-surface-variant);
+	--whale-focus-dark: var(--whale-focus); /* NGN red rings on the light surface */
+}
+
+[data-whale-theme="light"] .whale-trivia { --trivia-accent: var(--ngn-v2-sys-color-primary); } /* amber fails on white; red is 5.9:1 */
+[data-whale-theme="light"] .whale-step:not(.is-current) > .whale-card { opacity: 0.68; } /* keeps receding text ≥4.5:1 on white */
+
+[data-whale-theme="light"] .whale-scene ::selection {
+	background: var(--ngn-v2-sys-color-primary);
+	color: var(--ngn-v2-sys-color-on-primary);
+}
+
+/* Split layouts: the step bar sits on the column surface under the frame, so it goes light too.
+   (Stacked, it sits on the dark frame and stays dark.) */
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	[data-whale-theme="light"] .whale-nav[data-visible="true"] {
+		--scene-ink: var(--ngn-v2-sys-color-surface);
+		--scene-on: var(--ngn-v2-sys-color-on-surface);
+		--scene-on-muted: var(--ngn-v2-sys-color-on-surface-variant);
+		--whale-focus-dark: var(--whale-focus);
+	}
+}
+
+/*
+ * ?appbar=overlay (CONTRACT v7, default): the production header is fixed over the hero,
+ * transparent with white type above a soft top scrim; main.js sets data-appbar-state to
+ * over (hero under it) → solid (light prose under it) → away (scenes under it: slid up).
+ * Only transform and colours change, so nothing reflows. ?appbar=solid keeps the normal header.
+ */
+[data-appbar="overlay"] .site-header {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 7;
+	transition: transform 280ms ease, background-color 200ms ease;
+}
+
+[data-appbar="overlay"] .entry-content > .whale-hero { min-height: 100svh; } /* the header no longer takes room above it */
+[data-appbar="overlay"] .whale-hero__inner { padding-top: calc(var(--whale-header-h) + var(--space-xl)); }
+
+[data-appbar="overlay"][data-appbar-state="away"] .site-header { transform: translateY(-100%); }
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header {
+	--ngn-v2-scheme-surface: transparent;
+	--ngn-v2-scheme-on-surface: #fff; /* white on the hero image, over the scrim */
+	background: transparent;
+	color: #fff;
+}
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header::before {
+	content: "";
+	position: absolute;
+	z-index: -1;
+	inset: 0 0 auto;
+	height: calc(100% + var(--space-xxl));
+	background: linear-gradient(to bottom, color-mix(in srgb, var(--sea-deep) 70%, transparent), transparent);
+	pointer-events: none;
+}
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header :is(.ngn-bar, .bar__wrapper) {
+	background: transparent !important; /* production colour-scheme bars paint with !important-free but higher-specificity rules */
+	border-color: color-mix(in srgb, #fff 30%, transparent) !important;
+	color: #fff;
+}
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header :is(a, time, button, span, li) {
+	color: #fff !important;
+}
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header :is(.ngn-lockup, .social-links) :is(path, rect, circle) { fill: #fff; } /* filled marks only; stroked icons follow currentColor */
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header .menu-button__icon::before,
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header .menu-button__icon::after { background-color: #fff; }
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header .primary-menu__wrapper::after { display: none; } /* the skybox's black overflow fade */
+
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header .ngn-lockup path.ngn-lockup__monogram-letter { fill: var(--sea-deep); } /* letters knock out of the white block */
+[data-appbar="overlay"]:not([data-appbar-state="solid"]):not([data-appbar-state="away"]) .site-header .ngn-lockup path.ngn-lockup__arrow { fill: var(--ngn-v2-sys-color-primary); }
+[data-appbar="overlay"] .site-header :focus-visible { outline-color: var(--whale-focus-dark); }
+[data-appbar="overlay"][data-appbar-state="solid"] .site-header :focus-visible { outline-color: var(--whale-focus); }
+
+@media (prefers-reduced-motion: reduce) {
+	[data-appbar="overlay"] .site-header { transition: none; }
+}
+
+/* Cards carry a production colour-scheme class (white text); text follows the column theme. */
+.whale-scene .whale-card { color: var(--scene-on); }
+
+/* Scenes (v7 perf): the stage element takes the frame box, so the canvas renders only the frame.
+   Same geometry as .whale-frame per breakpoint (main.js toggles .is-framed at the hero→scene
+   boundary, while the frame is below the viewport). */
+#stage.is-framed {
+	inset: auto;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: var(--stage-h);
+	border-radius: var(--frame-radius);
+}
+
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	#stage.is-framed {
+		top: var(--c-inset);
+		right: var(--c-inset);
+		bottom: calc(var(--c-inset) + var(--rail-h) + var(--space-base));
+		left: var(--c-col);
+		height: auto;
+	}
+}
