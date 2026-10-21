@@ -67,22 +67,6 @@ function measureFrame() {
 measureFrame();
 window.addEventListener('resize', measureFrame, { passive: true });
 
-// Stacked layouts: a card taller than the reading strip under the frame scrolls through rather
-// than parking with its last lines held out of view.
-const parkers = [...document.querySelectorAll('.whale-step > .whale-card, .whale-step > .whale-trivia')];
-function markTallCards() {
-	const H = window.innerHeight;
-	const avail = H - frameBox.b - 32 - 16; // SpacingSys::Large park offset + Compact foot room
-	for (const el of parkers) el.classList.toggle('is-tall', frameBox.stacked && el.offsetHeight > avail);
-}
-markTallCards();
-window.addEventListener('resize', markTallCards, { passive: true });
-document.fonts?.ready.then(markTallCards);
-// Late font swaps change card heights: re-check whenever a card resizes.
-if ('ResizeObserver' in window) {
-	const ro = new ResizeObserver(() => markTallCards());
-	parkers.forEach((el) => ro.observe(el));
-}
 
 const lastScene = [...document.querySelectorAll('.whale-scene')].pop() || null;
 const firstScene = document.querySelector('.whale-scene');
@@ -377,18 +361,25 @@ function computeSafe(info, box, dt) {
 	for (const key of ['x0', 'y0', 'x1', 'y1']) sf[key] = Math.round((sf[key] + (safeTarget[key] - sf[key]) * k) * 1e4) / 1e4;
 }
 
-// Which card is being read: the step most visible in the reading area (below the frame when
-// the frame is stacked across the top).
-function currentCard(info, vh, readTop) {
+// Which card is being read.
+// Stacked (text flows under a top band): the last step whose top has crossed a trigger line
+// just below the band (band bottom + 15% of the viewport); the opener until the first does.
+// Split: the step most visible in the viewport, once it covers half of it.
+function currentCard(info, vh, bandBottom) {
+	if (bandBottom > 0) {
+		const trigger = bandBottom + vh * 0.15;
+		let idx = -1;
+		info.steps.forEach((el, i) => { if (el.getBoundingClientRect().top <= trigger) idx = i; });
+		return idx;
+	}
 	let best = -1;
 	let bestVis = 0;
 	info.steps.forEach((el, i) => {
 		const r = el.getBoundingClientRect();
-		const vis = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, readTop));
+		const vis = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
 		if (vis > bestVis) { bestVis = vis; best = i; }
 	});
-	// The opener owns the screen until a step covers at least half of the reading area.
-	return bestVis > (vh - readTop) * 0.5 ? best : (best > 0 ? best : -1);
+	return bestVis > vh * 0.5 ? best : (best > 0 ? best : -1);
 }
 
 // Per-frame state. Reads layout; writes only the stage's opacity/clip, the nav and is-current.
@@ -437,7 +428,7 @@ function computeState(dt) {
 
 	const info = sectionInfo[best];
 	state.card.count = info.steps.length;
-	state.card.index = isScene ? currentCard(info, vh, frameBox.stacked && framed ? stage.getBoundingClientRect().bottom : 0) : -1;
+	state.card.index = isScene ? currentCard(info, vh, frameBox.stacked ? Math.max(1, frameBox.b) : 0) : -1;
 	const currentStep = state.card.index >= 0 ? info.steps[state.card.index] : null;
 	if (currentStep !== lastStep) {
 		lastStep?.classList.remove('is-current');

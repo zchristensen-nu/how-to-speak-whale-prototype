@@ -395,11 +395,11 @@ body { background: var(--ngn-v2-sys-color-surface); }
 
 /*
  * Split stage geometry. One set of custom properties drives the stage frame, the text column,
- * the docked step bar and the sticky cards, so they can never disagree.
+ * the docked step bar and the text column, so they can never disagree.
  *
  * Stacked (phones, tablets, 1024 landscape): the frame spans the top --stage-h of the screen;
  * text runs beneath it on the dark scene surface. svh, not dvh: the frame must not resize
- * while the iOS address bar slides, and sticky offsets use the same unit.
+ * while the iOS address bar slides.
  *
  * Split (>= BreakpointSys::Large 1200, and short landscape phones): the frame is inset on the
  * right; the text column is --c-text wide (55–70ch of 19.3px Lato, which sets at 8.6px/ch).
@@ -520,8 +520,6 @@ body { background: var(--ngn-v2-sys-color-surface); }
 	padding-bottom: 0;
 }
 
-.entry-content > .whale-scene:last-of-type { padding-bottom: 20svh; } /* the beams hold before the closing prose */
-
 /* Text column (stacked: centred measure; split: the left column). */
 .whale-scene > * {
 	box-sizing: border-box;
@@ -538,7 +536,9 @@ body { background: var(--ngn-v2-sys-color-surface); }
 }
 
 /* The step the stage is showing reads at full strength; its neighbours recede (still 6:1). */
-.whale-step:not(.is-current) > .whale-card { opacity: 0.6; }
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	.whale-step:not(.is-current) > .whale-card { opacity: 0.6; }
+}
 
 /* Bonus trivia: set off by amber hairlines, serif voice and the click-wave glyph. No box. */
 .whale-trivia {
@@ -554,11 +554,20 @@ body { background: var(--ngn-v2-sys-color-surface); }
 
 .whale-trivia__glyph { margin-top: var(--space-micro); }
 
-/* Stacked: the opener heading and each card park just beneath the frame. */
+/*
+ * Stacked (phones, tablets): the frame is a sticky band across the top and the text flows
+ * beneath it like a normal article, with no card parking. Heading → first card is the
+ * production heading gap; beats are separated by a clear but modest gap. Any extra scroll the
+ * scene needs comes as one pad at the end of each section, never between cards.
+ */
 .whale-scene__opener {
 	align-items: flex-start;
-	min-height: 90svh;
-	padding-top: calc(var(--stage-h) + var(--space-xl));
+	min-height: 0;
+	padding-top: var(--space-xxl); /* between sections; the first scene clears the frame below */
+}
+
+.entry-content > .whale-scene:first-of-type .whale-scene__opener {
+	padding-top: calc(var(--stage-h) + var(--space-xl)); /* the frame arrives with this section's top */
 }
 
 .whale-scene__heading {
@@ -569,20 +578,16 @@ body { background: var(--ngn-v2-sys-color-surface); }
 .whale-step {
 	flex-direction: column;
 	align-items: stretch;
-	/* Each card parks for ~60svh minus its own height, then leaves with a 28svh run of empty
-	   surface before the next card enters (bottom padding is outside the sticky range). */
-	min-height: 88svh;
-	padding-bottom: 28svh;
+	margin-top: var(--space-xl); /* SpacingSys::Extra_Large between beats */
 }
 
-/* A card too tall for the reading area under the frame scrolls through instead of parking,
-   so its last lines are never held out of view (main.js measures and sets .is-tall). */
-.whale-step > .is-tall { position: static; }
+.whale-scene__opener + .whale-step { margin-top: var(--space-medium); } /* heading → its first card */
 
-.whale-step > :is(.whale-card, .whale-trivia) {
-	position: sticky;
-	top: calc(var(--stage-h) + var(--space-large));
-}
+/* End-of-section pad: room for the scene's motion to finish before the next opener. */
+.entry-content > .whale-scene { padding-bottom: 24svh; }
+
+/* The frame leaves with the last scene's bottom, so that section keeps a frame's height clear. */
+.entry-content > .whale-scene:last-of-type { padding-bottom: calc(var(--stage-h) + var(--space-xl)); }
 
 @media (min-width: 840px) {
 	.whale-scene__heading {
@@ -609,19 +614,22 @@ body { background: var(--ngn-v2-sys-color-surface); }
 		padding-right: var(--c-pad-r);
 	}
 
-	.whale-scene__opener {
+	.whale-scene__opener,
+	.entry-content > .whale-scene:first-of-type .whale-scene__opener {
 		align-items: center;
 		min-height: 80svh;
 		padding-top: 0;
 	}
 
-	.whale-step {
+	.whale-step,
+	.whale-scene__opener + .whale-step {
 		justify-content: center;
 		min-height: 80svh;
-		padding-bottom: 0;
+		margin-top: 0;
 	}
 
-	.whale-step > :is(.whale-card, .whale-trivia) { position: static; }
+	.entry-content > .whale-scene { padding-bottom: 0; }
+	.entry-content > .whale-scene:last-of-type { padding-bottom: 20svh; } /* the beams hold before the closing prose */
 }
 
 @media (min-width: 1200px) {
@@ -901,7 +909,9 @@ body { background: var(--ngn-v2-sys-color-surface); }
 }
 
 [data-whale-theme="light"] .whale-trivia { --trivia-accent: var(--ngn-v2-sys-color-primary); } /* amber fails on white; red is 5.9:1 */
-[data-whale-theme="light"] .whale-step:not(.is-current) > .whale-card { opacity: 0.68; } /* keeps receding text ≥4.5:1 on white */
+@media (min-width: 1200px), (orientation: landscape) and (max-height: 540px) {
+	[data-whale-theme="light"] .whale-step:not(.is-current) > .whale-card { opacity: 0.68; } /* keeps receding text ≥4.5:1 on white */
+}
 
 [data-whale-theme="light"] .whale-scene ::selection {
 	background: var(--ngn-v2-sys-color-primary);
